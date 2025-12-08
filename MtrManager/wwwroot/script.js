@@ -114,14 +114,17 @@ class CompanyManager {
     
     async loadCompanyForEdit(cnpj) {
         try {
-            const response = await fetch(`/Company/${cnpj}`, {
-                headers: { 'Accept': 'application/json' }
-            })
-            
-            if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`)
-            
-            const company = await response.json()
+
+            const formEdit = document.getElementById('company-form-section');
+            const companyTable = document.getElementById('companyTableBody');
+
+            const company = allCompanies.find(c => c.cnpj == cnpj);
+
             this.populateForm(company)
+
+            companyTable.style.display = "none";
+            formEdit.style.display = "block";
+
             this.editingCnpj = cnpj
             this.btnFormSubmit.textContent = 'Atualizar'
             this.formCnpj.disabled = true
