@@ -1,0 +1,114 @@
+using Microsoft.AspNetCore.Mvc;
+using MtrManager.Entities;
+using System.Text.RegularExpressions;
+using System.Xml.Serialization;
+
+namespace MtrManager.Controllers
+{
+    [ApiController]
+    [Route("[controller]")]
+    public class ManifestoController : ControllerBase
+    {
+        private static readonly Regex _regex = new Regex(@"\D");
+
+        /// <summary>
+        /// Obtém manifestos filtrados por CNPJ e opcionalmente por período
+        /// </summary>
+        /// <param name="cnpj">CNPJ da empresa</param>
+        /// <param name="startDate">Data inicial (opcional) - formato: YYYY-MM-DD</param>
+        /// <param name="endDate">Data final (opcional) - formato: YYYY-MM-DD</param>
+        /// <returns>Lista de manifestos</returns>
+        [HttpGet("GetByCnpj/{cnpj}")]
+        public IEnumerable<Manifesto> Get(
+            string cnpj, 
+            [FromQuery] DateTime? startDate = null, 
+            [FromQuery] DateTime? endDate = null)
+        {
+            if (cnpj.Length > 14)
+                cnpj = _regex.Replace(cnpj, "");
+
+            if (Directory.Exists($"C:\\Users\\act\\Desktop\\Mtrs\\{cnpj}"))
+            {
+                List<Manifesto> manifestos = new();
+                string basePath = $@"C:\Users\act\Desktop\Mtrs\{cnpj}";
+                string[] arquivos = Directory.GetFiles(basePath, "*.xml", SearchOption.TopDirectoryOnly);
+
+                foreach (string arquivo in arquivos)
+                {
+                    var serializer = new XmlSerializer(typeof(Manifesto));
+                    using var stream = System.IO.File.OpenRead(arquivo);
+
+                    Manifesto? manifesto = (Manifesto?)serializer.Deserialize(stream);
+
+                    if (manifesto != null)
+                    {
+                        // Se houver filtro de datas, aplicar
+                        if (startDate.HasValue && endDate.HasValue)
+                        {
+                            // Converter dataEmissao para DateTime e comparar
+                            if (DateTime.TryParse(manifesto.gerador.dataEmissao, out var emissao))
+                            {
+                                // Incluir se estiver dentro do intervalo
+                                if (emissao >= startDate.Value && emissao <= endDate.Value)
+                                {
+                                    manifestos.Add(manifesto);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Se não houver filtro de datas, adicionar tudo
+                            manifestos.Add(manifesto);
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[WARN] Arquivo '{Path.GetFileName(arquivo)}' não gerou objeto.");
+                    }
+                }
+
+                return manifestos;
+            }
+            return [];
+        }
+
+        /// <summary>
+        /// Atualiza o status de um manifesto
+        /// </summary>
+        /// <param name="mtrNumero">Número da MTR</param>
+        /// <returns>Resultado da operação</returns>
+        [HttpPost("Update/{mtrNumero}")]
+        public IActionResult Update(string mtrNumero)
+        {
+            try
+            {
+                // TODO: Implementar lógica de atualização
+                // Exemplos:
+                // - Marcar como processado
+                // - Atualizar status em banco de dados
+                // - Mover arquivo para pasta de arquivados
+                // - Registrar em log de auditoria
+
+                // Por enquanto, apenas retornar sucesso
+                return Ok(new
+                {
+                    success = true,
+                    message = "Manifesto atualizado com sucesso",
+                    mtrNumero = mtrNumero,
+                    timestamp = DateTime.Now
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Erro ao atualizar manifesto {mtrNumero}: {ex.Message}");
+                
+                return BadRequest(new
+                {
+                    success = false,
+                    message = ex.Message,
+                    mtrNumero = mtrNumero
+                });
+            }
+        }
+    }
+}

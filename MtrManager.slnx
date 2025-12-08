@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MtrManager/MtrManager.csproj" />
+  <Project Path="SinirIntegration/SinirIntegration.csproj" />
+</Solution>
