@@ -9,6 +9,7 @@ let allCompanies = []
 let companySearch = null
 let dateRangeSelector = null
 let notificationManager = null
+let loadingManager = null
 let companyManager = null
 let selectedDates = { startDate: null, endDate: null }
 
@@ -25,7 +26,7 @@ class CompanyManager {
         this.btnClose = document.getElementById('btnCloseCompanyManager')
         this.form = document.getElementById('companyForm')
         this.tableBody = document.getElementById('companyTableBody')
-        
+
         // Form fields
         this.formCnpj = document.getElementById('formCnpj')
         this.formRazaoSocial = document.getElementById('formRazaoSocial')
@@ -35,62 +36,66 @@ class CompanyManager {
         this.formAtivo = document.getElementById('formAtivo')
         this.btnFormSubmit = document.getElementById('btnFormSubmit')
         this.btnFormCancel = document.getElementById('btnFormCancel')
-        
+
         this.editingCnpj = null
-        
+
         this.init()
     }
-    
+
     init() {
         this.btnOpen.addEventListener('click', () => this.open())
         this.btnClose.addEventListener('click', () => this.close())
         this.form.addEventListener('submit', (e) => this.handleSubmit(e))
         this.btnFormCancel.addEventListener('click', () => this.resetForm())
     }
-    
+
     open() {
         this.modal.classList.add('show')
         this.backdrop.classList.add('show')
         this.backdrop.setAttribute('aria-hidden', 'false')
         this.loadCompanies()
     }
-    
+
     close() {
         this.modal.classList.remove('show')
         this.backdrop.classList.remove('show')
         this.backdrop.setAttribute('aria-hidden', 'true')
         this.resetForm()
     }
-    
+
     async loadCompanies() {
         try {
+            loadingManager.show('Carregando empresas...')
+
             const response = await fetch('/Company/GetAll', {
                 headers: { 'Accept': 'application/json' }
             })
-            
+
             if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`)
-            
+
             const companies = await response.json()
+            console.log(companies);
             this.renderTable(companies)
         } catch (err) {
             console.error('Erro ao carregar empresas:', err)
             notificationManager.show('Erro', 'Erro ao carregar empresas', 'error')
+        } finally {
+            loadingManager.hide()
         }
     }
-    
+
     renderTable(companies) {
         this.tableBody.innerHTML = ''
-        
         if (companies.length === 0) {
             this.tableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted); padding: 20px;">Nenhuma empresa cadastrada</td></tr>'
             return
         }
-        
+
         companies.forEach(company => {
             const tr = document.createElement('tr')
             const statusClass = company.ativo ? 'status-active' : 'status-inactive'
             const statusText = company.ativo ? 'Ativa' : 'Inativa'
-            
+
             tr.innerHTML = `
                 <td>${company.cnpj}</td>
                 <td>${company.razaoSocial}</td>
@@ -100,35 +105,36 @@ class CompanyManager {
                 <td>
                     <div class="company-table-actions">
                         <button type="button" class="btn-edit" data-cnpj="${company.cnpj}">Editar</button>
-                        <button type="button" class="btn-delete" data-cnpj="${company.cnpj}">Deletar</button>
                     </div>
                 </td>
             `
-            
+
             tr.querySelector('.btn-edit').addEventListener('click', () => this.loadCompanyForEdit(company.cnpj))
-            tr.querySelector('.btn-delete').addEventListener('click', () => this.deleteCompany(company.cnpj))
-            
+
             this.tableBody.appendChild(tr)
         })
+        console.log(this.tableBody);
+
     }
-    
+
     async loadCompanyForEdit(cnpj) {
         try {
 
             const formEdit = document.getElementById('company-form-section');
-            const companyTable = document.getElementById('companyTableBody');
+            const companyTable = document.getElementById('company-list-section');
+
+            companyTable.style.display = 'none';
+            formEdit.style.display = 'flex';
+
 
             const company = allCompanies.find(c => c.cnpj == cnpj);
 
             this.populateForm(company)
 
-            companyTable.style.display = "none";
-            formEdit.style.display = "block";
-
             this.editingCnpj = cnpj
             this.btnFormSubmit.textContent = 'Atualizar'
             this.formCnpj.disabled = true
-            
+
             // Scroll para o formulário
             document.querySelector('.company-form-section').scrollIntoView({ behavior: 'smooth' })
         } catch (err) {
@@ -136,7 +142,7 @@ class CompanyManager {
             notificationManager.show('Erro', 'Erro ao carregar empresa', 'error')
         }
     }
-    
+
     populateForm(company) {
         this.formCnpj.value = company.cnpj
         this.formRazaoSocial.value = company.razaoSocial
@@ -145,18 +151,24 @@ class CompanyManager {
         this.formSenha.value = company.senha
         this.formAtivo.checked = company.ativo
     }
-    
+
     resetForm() {
         this.form.reset()
         this.editingCnpj = null
         this.btnFormSubmit.textContent = 'Adicionar'
         this.formCnpj.disabled = false
         this.formAtivo.checked = true
+
+        const formEdit = document.getElementById('company-form-section');
+        const companyTable = document.getElementById('company-list-section');
+
+        companyTable.style.display = 'flex';
+        formEdit.style.display = 'none';
     }
-    
+
     async handleSubmit(e) {
         e.preventDefault()
-        
+
         const company = {
             cnpj: this.formCnpj.value,
             razaoSocial: this.formRazaoSocial.value,
@@ -165,10 +177,12 @@ class CompanyManager {
             senha: this.formSenha.value,
             ativo: this.formAtivo.checked
         }
-        
+
         try {
             if (this.editingCnpj) {
                 // Update
+                loadingManager.show('Atualizando empresa...')
+
                 const response = await fetch(`/Company/${this.editingCnpj}`, {
                     method: 'PUT',
                     headers: {
@@ -177,12 +191,14 @@ class CompanyManager {
                     },
                     body: JSON.stringify(company)
                 })
-                
+
                 if (!response.ok) throw new Error('Erro ao atualizar empresa')
-                
+
                 notificationManager.show('Sucesso!', 'Empresa atualizada com sucesso', 'success')
             } else {
                 // Create
+                loadingManager.show('Criando empresa...')
+
                 const response = await fetch('/Company/Create', {
                     method: 'POST',
                     headers: {
@@ -191,44 +207,45 @@ class CompanyManager {
                     },
                     body: JSON.stringify(company)
                 })
-                
+
                 if (!response.ok) {
                     const error = await response.json()
                     throw new Error(error.error || 'Erro ao criar empresa')
                 }
-                
+
                 notificationManager.show('Sucesso!', 'Empresa criada com sucesso', 'success')
             }
-            
+
             this.resetForm()
-            this.loadCompanies()
+            await this.loadCompanies()
             await recarregarEmpresas()
         } catch (err) {
             console.error('Erro:', err)
             notificationManager.show('Erro', err.message, 'error')
+        } finally {
+            loadingManager.hide()
         }
     }
-    
-    async deleteCompany(cnpj) {
-        if (!confirm(`Tem certeza que deseja deletar a empresa com CNPJ ${cnpj}?`)) {
-            return
-        }
-        
-        try {
-            const response = await fetch(`/Company/${cnpj}`, {
-                method: 'DELETE',
-                headers: { 'Accept': 'application/json' }
-            })
-            
-            if (!response.ok) throw new Error('Erro ao deletar empresa')
-            
-            notificationManager.show('Sucesso!', 'Empresa deletada com sucesso', 'success')
-            this.loadCompanies()
-            await recarregarEmpresas()
-        } catch (err) {
-            console.error('Erro ao deletar:', err)
-            notificationManager.show('Erro', err.message, 'error')
-        }
+}
+
+// ============================================
+// CLASSE: LoadingManager
+// Gerencia modal de loading
+// ============================================
+
+class LoadingManager {
+    constructor() {
+        this.modal = document.getElementById('loadingModal')
+        this.message = document.getElementById('loadingMessage')
+    }
+
+    show(message = 'Carregando...') {
+        this.message.textContent = message
+        this.modal.classList.add('show')
+    }
+
+    hide() {
+        this.modal.classList.remove('show')
     }
 }
 
@@ -247,25 +264,25 @@ class NotificationManager {
         this.btnClose = document.getElementById('btnCloseNotification')
         this.backdrop = document.getElementById('backdrop')
         this.currentType = 'info'
-        
+
         this.init()
     }
-    
+
     init() {
         this.btnOk.addEventListener('click', () => this.close())
         this.btnClose.addEventListener('click', () => this.close())
     }
-    
+
     show(title, message, type = 'info') {
         this.currentType = type
         this.title.textContent = title
         this.message.textContent = message
-        
+
         // Remove all type classes
         this.modal.classList.remove('type-success', 'type-error', 'type-warning', 'type-info')
-        
+
         // Set icon and type
-        switch(type) {
+        switch (type) {
             case 'success':
                 this.icon.textContent = '✓'
                 this.modal.classList.add('type-success')
@@ -282,12 +299,12 @@ class NotificationManager {
                 this.icon.textContent = 'ℹ'
                 this.modal.classList.add('type-info')
         }
-        
+
         this.modal.classList.add('show')
         this.backdrop.classList.add('show')
         this.backdrop.setAttribute('aria-hidden', 'false')
     }
-    
+
     close() {
         this.modal.classList.remove('show')
         this.backdrop.classList.remove('show')
@@ -313,14 +330,14 @@ class DateRangeSelector {
         this.btnCancel = document.getElementById('btnCancelDateModal')
         this.btnClose = document.getElementById('btnCloseDateModal')
         this.backdrop = document.getElementById('backdrop')
-        
+
         this.selectedDateStart = null
         this.selectedDateEnd = null
         this.maxDays = 30
-        
+
         this.init()
     }
-    
+
     init() {
         this.dateStart.addEventListener('change', (e) => this.handleDateStartChange(e))
         this.dateEnd.addEventListener('change', (e) => this.handleDateEndChange(e))
@@ -329,45 +346,45 @@ class DateRangeSelector {
         this.btnClose.addEventListener('click', () => this.close())
         this.backdrop.addEventListener('click', () => this.close())
     }
-    
+
     open() {
         this.modal.classList.add('show')
         this.backdrop.classList.add('show')
         this.backdrop.setAttribute('aria-hidden', 'false')
-        
+
         // Set default dates
         const today = new Date()
         const defaultStart = today.toISOString().split('T')[0]
         const defaultEnd = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        
+
         this.dateStart.value = defaultStart
         this.dateEnd.value = defaultEnd
         this.dateStart.min = ''
         this.dateEnd.min = defaultStart
-        
+
         this.selectedDateStart = defaultStart
         this.selectedDateEnd = defaultEnd
         this.updateInterval()
     }
-    
+
     close() {
         this.modal.classList.remove('show')
         this.backdrop.classList.remove('show')
         this.backdrop.setAttribute('aria-hidden', 'true')
         this.clearErrors()
     }
-    
+
     handleDateStartChange(e) {
         const newStart = e.target.value
-        
+
         if (!newStart) {
             this.showError('dateStartError', 'Data inicial é obrigatória')
             return
         }
-        
+
         this.clearError('dateStartError')
         const startDate = new Date(newStart)
-        
+
         // If end date is empty, add 30 days to start
         if (!this.selectedDateEnd || this.dateEnd.value === '') {
             const endDate = new Date(startDate.getTime() + this.maxDays * 24 * 60 * 60 * 1000)
@@ -380,7 +397,7 @@ class DateRangeSelector {
             if (previousStart) {
                 const currentInterval = Math.floor((new Date(this.selectedDateEnd).getTime() - previousStart.getTime()) / (24 * 60 * 60 * 1000))
                 const newEndDate = new Date(startDate.getTime() + currentInterval * 24 * 60 * 60 * 1000)
-                
+
                 // Check if new end date exceeds max days
                 if (currentInterval > this.maxDays) {
                     const maxEndDate = new Date(startDate.getTime() + this.maxDays * 24 * 60 * 60 * 1000)
@@ -390,19 +407,19 @@ class DateRangeSelector {
                     this.selectedDateEnd = newEndDate.toISOString().split('T')[0]
                     this.clearError('dateEndError')
                 }
-                
+
                 this.dateEnd.value = this.selectedDateEnd
             }
         }
-        
+
         this.selectedDateStart = newStart
         this.dateEnd.min = newStart
         this.updateInterval()
     }
-    
+
     handleDateEndChange(e) {
         const newEnd = e.target.value
-        
+
         if (!newEnd) {
             // If end date is cleared, set to 30 days from start
             if (this.selectedDateStart) {
@@ -416,27 +433,27 @@ class DateRangeSelector {
             const startDate = new Date(this.selectedDateStart)
             const endDate = new Date(newEnd)
             const diffDays = Math.floor((endDate.getTime() - startDate.getTime()) / (24 * 60 * 60 * 1000))
-            
+
             if (diffDays < 0) {
                 this.showError('dateEndError', 'Data fim não pode ser anterior à data inicial')
                 this.dateEnd.value = this.selectedDateEnd || ''
                 return
             }
-            
+
             if (diffDays > this.maxDays) {
                 this.showError('dateEndError', `Intervalo máximo é ${this.maxDays} dias (selecionados ${diffDays})`)
                 this.dateEnd.value = this.selectedDateEnd || ''
                 return
             }
-            
+
             this.clearError('dateEndError')
             this.selectedDateEnd = newEnd
             this.clearInfo('dateEndInfo')
         }
-        
+
         this.updateInterval()
     }
-    
+
     updateInterval() {
         if (this.selectedDateStart && this.selectedDateEnd) {
             const start = new Date(this.selectedDateStart)
@@ -447,58 +464,58 @@ class DateRangeSelector {
             this.dateInterval.textContent = '-'
         }
     }
-    
+
     handleApply() {
         if (!this.selectedDateStart) {
             this.showError('dateStartError', 'Data inicial é obrigatória')
             return
         }
-        
+
         if (!this.selectedDateEnd) {
             this.showError('dateEndError', 'Data final é obrigatória')
             return
         }
-        
+
         // Armazena as datas selecionadas na variável global
         selectedDates.startDate = this.selectedDateStart
         selectedDates.endDate = this.selectedDateEnd
-        
+
         this.close()
-        
+
         // Chama a função de carregamento de manifestos
         // Busca a empresa selecionada
         const selectedCompanyName = document.getElementById('companySearch').value
         const selectedCompany = allCompanies.find(c => `${c.unidade} - ${c.razaoSocial}` === selectedCompanyName)
-        
+
         if (selectedCompany) {
             carregarManifestosComDatas(selectedCompany)
         }
     }
-    
+
     showError(elementId, message) {
         const element = document.getElementById(elementId)
         element.textContent = message
         element.classList.add('show')
     }
-    
+
     clearError(elementId) {
         const element = document.getElementById(elementId)
         element.textContent = ''
         element.classList.remove('show')
     }
-    
+
     showInfo(elementId, message) {
         const element = document.getElementById(elementId)
         element.textContent = message
         element.classList.add('show')
     }
-    
+
     clearInfo(elementId) {
         const element = document.getElementById(elementId)
         element.textContent = ''
         element.classList.remove('show')
     }
-    
+
     clearErrors() {
         this.clearError('dateStartError')
         this.clearError('dateEndError')
@@ -527,7 +544,7 @@ class CompanySearch {
 
     handleSearch(e) {
         const query = e.target.value.toLowerCase().trim()
-        
+
         if (!query) {
             this.filteredCompanies = allCompanies
         } else {
@@ -536,7 +553,7 @@ class CompanySearch {
                 return text.includes(query)
             })
         }
-        
+
         this.currentIndex = -1
         this.renderDropdown()
         this.showDropdown()
@@ -553,16 +570,16 @@ class CompanySearch {
         this.filteredCompanies.forEach((company, index) => {
             const option = document.createElement('div')
             option.className = 'company-option'
-            
+
             // Aplicar classe de inativo se ativo for false
             if (!company.ativo) {
                 option.classList.add('inactive')
             }
-            
+
             if (this.selectedValue === company.cnpj) {
                 option.classList.add('selected')
             }
-            
+
             option.innerHTML = `
                 <div>${company.unidade} - ${company.razaoSocial}</div>
                 <span class="company-option-meta">CNPJ: ${company.cnpj}</span>
@@ -576,7 +593,7 @@ class CompanySearch {
         this.selectedValue = company.cnpj
         this.searchInput.value = `${company.unidade} - ${company.razaoSocial}`
         this.hideDropdown()
-        
+
         // Trigger company change handler
         const event = new CustomEvent('companySelected', { detail: { cnpj: company.cnpj } })
         document.dispatchEvent(event)
@@ -639,13 +656,14 @@ class CompanySearch {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-const tbody = document.querySelector('#manifestList tbody')
-window.tbody = tbody
-notificationManager = new NotificationManager()
-companyManager = new CompanyManager()
-companySearch = new CompanySearch()
-dateRangeSelector = new DateRangeSelector()
-    
+    const tbody = document.querySelector('#manifestList tbody')
+    window.tbody = tbody
+    loadingManager = new LoadingManager()
+    notificationManager = new NotificationManager()
+    companyManager = new CompanyManager()
+    companySearch = new CompanySearch()
+    dateRangeSelector = new DateRangeSelector()
+
     // Setup modal elements
     window.modal = document.getElementById('pedidoModal')
     window.backdrop = document.getElementById('backdrop')
@@ -654,7 +672,7 @@ dateRangeSelector = new DateRangeSelector()
     window.btnAdvance = document.getElementById('btnAdvance')
     window.btnRefresh = document.getElementById('btnRefresh')
     window.currentMtr = null
-    
+
     // Add click listener to table
     tbody.addEventListener('click', (e) => {
         const row = e.target.closest('tr')
@@ -677,7 +695,7 @@ dateRangeSelector = new DateRangeSelector()
         window.currentMtr = dados.mtr
         openModal()
     })
-    
+
     // Add modal button listeners
     window.btnClose.addEventListener('click', closeModal)
     window.btnCancel.addEventListener('click', closeModal)
@@ -693,7 +711,7 @@ dateRangeSelector = new DateRangeSelector()
         // Abrir modal de datas
         dateRangeSelector.open()
     })
-    
+
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && window.modal.classList.contains('show')) {
             closeModal()
@@ -860,9 +878,10 @@ function tdText(texto) {
  */
 async function carregarManifestosComDatas(company) {
     try {
+        loadingManager.show('Conectando ao SINIR e baixando manifestos...')
         window.btnRefresh.classList.add('loading')
         window.btnRefresh.disabled = true
-        
+
         const requestData = {
             cnpj: company.cnpj,
             cpf: company.cpf,
@@ -871,51 +890,54 @@ async function carregarManifestosComDatas(company) {
             initialDate: selectedDates.startDate,
             finalDate: selectedDates.endDate,
             fileType: 'code',
-            headless: false
+            headless: true
         }
 
         console.log('Chamando UpdateMtrs com CNPJ:', company.cnpj)
 
         const response = await fetch('/Manifesto/UpdateMtrs', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json' 
+                'Accept': 'application/json'
             },
             body: JSON.stringify(requestData)
         })
-        
+
         const data = await response.json()
 
         if (!response.ok) {
             // Capturar a mensagem de erro retornada e exibir no pop-up
             const errorMessage = data.error || `Erro HTTP: ${response.status}`
             console.error('Erro ao carregar manifestos:', errorMessage)
-            
+
             // Se foi erro de login, atualizar o status da empresa para inativo
             if (data.loginFailed) {
                 console.log('Login falhou para CNPJ:', company.cnpj)
                 // Recarregar a lista de empresas para atualizar os status
                 await recarregarEmpresas()
             }
-            
+
             // Exibir mensagem de erro em notificação
             notificationManager.show('Erro ao baixar MTRs', errorMessage, 'error')
             return
         }
-        
+
         console.log('Resultado do UpdateMtrs:', data)
-        
+
+        loadingManager.show('Processando manifestos...')
+
         // Após download bem-sucedido, carregar os manifestos
         await carregarManifestosLocal(company.cnpj)
-        
+
         // Exibir mensagem de sucesso
         notificationManager.show('Sucesso!', data.message, 'success')
-        
+
     } catch (err) {
         console.error('Erro ao carregar manifestos:', err)
         notificationManager.show('Erro ao carregar manifestos', err.message, 'error')
     } finally {
+        loadingManager.hide()
         window.btnRefresh.classList.remove('loading')
         window.btnRefresh.disabled = false
     }
@@ -926,19 +948,19 @@ async function carregarManifestosComDatas(company) {
  */
 async function recarregarEmpresas() {
     try {
-        const response = await fetch('/Company/GetAll', { 
-            headers: { 'Accept': 'application/json' } 
+        const response = await fetch('/Company/GetAll', {
+            headers: { 'Accept': 'application/json' }
         })
-        
+
         if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status}`)
         }
-        
+
         const companies = await response.json()
         companySearch.setCompanies(companies)
         console.log(companies)
         console.log('Empresas recarregadas com sucesso')
-        
+
     } catch (err) {
         console.error('Erro ao recarregar empresas:', err)
     }
@@ -950,17 +972,17 @@ async function recarregarEmpresas() {
  */
 async function carregarManifestosLocal(cnpj) {
     try {
-        const response = await fetch('/Manifesto/GetByCnpj/' + cnpj, { 
-            headers: { 'Accept': 'application/json' } 
+        const response = await fetch('/Manifesto/GetByCnpj/' + cnpj, {
+            headers: { 'Accept': 'application/json' }
         })
-        
+
         if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status}`)
         }
-        
+
         const manifestosResponse = await response.json()
         atualizarTabelaManifestos(manifestosResponse)
-        
+
     } catch (err) {
         console.error('Erro ao carregar manifestos locais:', err)
         notificationManager.show('Erro', 'Erro ao carregar manifestos locais.', 'error')
@@ -1016,7 +1038,7 @@ function atualizarTabelaManifestos(manifestosData) {
  */
 async function atualizarManifesto() {
     const mtrNumber = window.currentMtr
-    
+
     if (!mtrNumber) {
         alert('Nenhum manifesto selecionado')
         return
@@ -1025,27 +1047,27 @@ async function atualizarManifesto() {
     try {
         window.btnAdvance.disabled = true
         window.btnAdvance.textContent = 'Processando...'
-        
+
         console.log('Atualizando manifesto:', mtrNumber)
 
         const response = await fetch(`/Manifesto/Update/${mtrNumber}`, {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json' 
+                'Accept': 'application/json'
             }
         })
-        
+
         if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status}`)
         }
-        
+
         const result = await response.json()
-        
+
         // Mostrar sucesso
         window.btnAdvance.textContent = '✓ Sucesso!'
         window.btnAdvance.style.background = 'var(--color-success)'
-        
+
         setTimeout(() => {
             window.btnAdvance.textContent = 'Avançar'
             window.btnAdvance.style.background = ''
@@ -1054,13 +1076,13 @@ async function atualizarManifesto() {
             // Opcional: recarregar manifestos após atualizar
             // location.reload()
         }, 2000)
-        
+
     } catch (err) {
         console.error('Erro ao atualizar manifesto:', err)
-        
+
         window.btnAdvance.textContent = '✕ Erro'
         window.btnAdvance.style.background = '#e74c3c'
-        
+
         setTimeout(() => {
             window.btnAdvance.textContent = 'Avançar'
             window.btnAdvance.style.background = ''

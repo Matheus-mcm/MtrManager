@@ -70,7 +70,6 @@ namespace MtrManager.Controllers
 
                 if (!result.Success)
                 {
-                    // Se o login falhou, marcar a empresa como inativa
                     if (!result.LoginSuccess)
                     {
                         _companyService.UpdateCompanyStatus(request.Cnpj, false);
@@ -79,7 +78,6 @@ namespace MtrManager.Controllers
                     return BadRequest(new { error = result.Message, loginFailed = !result.LoginSuccess });
                 }
 
-                // Se o login foi bem-sucedido, marcar a empresa como ativa
                 _companyService.UpdateCompanyStatus(request.Cnpj, true);
 
                 return Ok(new { message = result.Message, filesDownloaded = result.FilesDownloaded });
