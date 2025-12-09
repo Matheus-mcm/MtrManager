@@ -1,10 +1,6 @@
-# 🌐 Nome do Projeto
+# 🌐 MTR MANAGER
 
-Breve descrição do que o projeto faz e por que ele existe.
-
-Exemplo:
-
-API para gerenciamento de pedidos, desenvolvida em .NET 10 utilizando Clean Architecture e PostgreSQL. Focada em escalabilidade, testes automatizados e documentação completa.
+Portal projetado para extrair, de forma automática, todas as informações sobre os Manifestos de Transporte de Resíduos, com o intuito de facilitar a geração de Planos de Gerenciamento de Resíduos Sólidos.
 
 ## 📑 Sumário
 
@@ -36,35 +32,53 @@ Licença
 
 ## 📘 Visão Geral
 
-Explique o propósito do projeto:
+O Portal de Gerenciamento de Manifestos de Transporte de Resíduos (MTR) foi desenvolvido para dar suporte ao processo de geração dos Planos de Gerenciamento de Resíduos Sólidos. Atualmente, a equipe precisa acessar o portal do SINIR, navegar manualmente entre diversas páginas e realizar os downloads um a um, tornando a atividade lenta, repetitiva e suscetível a erros.
 
-O que ele resolve
-
-Quem usa
-
-Quais problemas pretende atacar
-
-Escopo atual e futuro
+O novo portal centraliza todo o processo em uma interface única, automatizando a coleta dos arquivos, o processamento dos dados e a disponibilização das informações de forma padronizada, intuitiva e assertiva. Com isso, o projeto reduz significativamente o tempo dedicado à atividade, elimina falhas humanas e aumenta a produtividade da equipe.
 
 ## 🏛 Arquitetura
 
-Descreva o padrão utilizado:
+A solução é composta por três camadas principais:
 
-Clean Architecture / DDD / Onion / Hexagonal
+### 1) Backend (.NET 10)
+Responsável por:
+- Gerenciar regras de negócio  
+- Orquestrar a automação  
+- Processar os arquivos obtidos  
+- Expor endpoints e serviços internos  
 
-CQRS (se houver)
+Organizado nas seguintes camadas:
+- **Controllers** — Expõe endpoints para interface do portal
+- **Entities** — Entidades de dados  
+- **Services** — Controla todo o processamento de dados, tratativas e comunicação com a automação  
 
-Uso de camadas (Application, Domain, Infrastructure, API)
+---
 
-Abordagem REST/GraphQL
+### 2) Módulo de Automação (Playwright)
+- Realiza navegação no portal do SINIR  
+- Efetua login e navegação automática  
+- Executa downloads dos manifestos  
+- Entrega os arquivos ao backend para processamento  
 
-Etapas de processamento
+Integrado ao backend por meio de serviços injetados e executores específicos.
 
-Se tiver diagramas:
+---
 
-docs/
-  diagrams/
-    arquitetura-c4.puml
+### 3) Interface Web
+Aplicação web simples (HTML/CSS/JS) utilizada pelo usuário para:
+- Acionar o processo de automação  
+- Exibir as informações dos manifestos
+- Gerenciar cadastros das empresas
+
+---
+
+### Fluxo Geral
+1. Usuário aciona o processo via portal  
+2. Backend dispara o módulo de automação  
+3. Playwright acessa o site do SINIR  
+4. Arquivos são baixados e enviados ao backend  
+5. Backend processa e padroniza os dados  
+6. Portal exibe os dados ao usuário
 
 ## 🧰 Tecnologias Utilizadas
 
@@ -74,26 +88,11 @@ Lista de tecnologias principais:
 
 ASP.NET Core Web API
 
-Entity Framework Core
-
-PostgreSQL / SQL Server
-
-Redis
-
-Swagger / OpenAPI
-
-Docker / Docker Compose
-
-Dapper / MediatR / FluentValidation
-
 ## 📦 Requisitos
-.NET 10 SDK
-Docker e Docker Compose (opcional para ambiente local)
-PostgreSQL ou SQL Server
+
+- Windows 11
 
 ## ▶️ Como Rodar o Projeto
-🔹 Via Docker
-docker compose up --build
 
 🔹 Localmente
 
@@ -111,89 +110,17 @@ Rodar o projeto:
 
 dotnet run --project src/Api
 
-## 🔐 Variáveis de Ambiente
-
-Crie um .env ou use appsettings.json:
-
-ConnectionStrings__Default=Host=localhost;Port=5432;...
-ASPNETCORE_ENVIRONMENT=Development
-JWT__Secret=...
-
 ## 📁 Estrutura do Projeto
 
-Exemplo (ajuste conforme seu projeto):
-
-/src
-  /Api
-  /Application
-  /Domain
-  /Infrastructure
-
-/tests
-  /Unit
-  /Integration
-
-/docs
-  /adr
-  /diagrams
-
-README.md
-docker-compose.yml
 
 ## 📚 Documentação
-🔹 Swagger (API)
 
-Ao rodar o projeto, acesse:
-
-/swagger/index.html
-
-🔹 Documentação técnica (Docusaurus / MkDocs / DocFX)
-
-Link ou caminho interno:
-
-docs/
-
-🔹 ADRs
-docs/adr/0001-escolha-da-arquitetura.md
-
-## 🧪 Testes
-Executar testes:
-dotnet test
-
-Cobertura (ex. coverlet)
-dotnet test /p:CollectCoverage=true
 
 ## 🗺 Roadmap
 
- Criar módulo de autenticação
-
- Adicionar cache com Redis
-
- Criar documentação completa via DocFX
-
- Implementar observabilidade (Serilog + OpenTelemetry)
-
- Deploy automatizado (GitHub Actions)
-
-## 🤝 Contribuição
-
-Faça um fork
-
-Crie uma branch
-
-Commit suas alterações
-
-Abra um Pull Request
 
 ## 👤 Autores
 
-Seu Nome — Desenvolvedor
-
-LinkedIn/GitHub/etc.
+Matheus Cardoso — Desenvolvedor
 
 ## 📄 Licença
-
-Escolha uma licença (MIT é a mais comum).
-Exemplo:
-
-Este projeto está licenciado sob a licença MIT.
